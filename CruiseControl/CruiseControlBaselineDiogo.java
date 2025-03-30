@@ -1,13 +1,13 @@
 package CruiseControl;
 
 public class CruiseControlBaselineDiogo {
-    public static double adjustAcceleration(int currentSpeed, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
+    public static float adjustAcceleration(int currentSpeed, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
         int lowerBound = setSpeed - error;
         int upperBound = setSpeed + error;
         
         // Se a velocidade atual estiver dentro da faixa aceitável, não há necessidade de ajuste.
         if (currentSpeed >= lowerBound && currentSpeed <= upperBound) {
-            return 0.0;
+            return 0;
         }
         
         // Se a velocidade atual estiver abaixo do limite inferior, é suposto acelarar.
