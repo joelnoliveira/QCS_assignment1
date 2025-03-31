@@ -20,14 +20,16 @@ differ
 ### Desvantagens
 ...
 ## Redundancy
+- Redundancy is the ingredient of Replication
 ### Teórica
 #### Hardware redundancy
 - TMR vs DMR vs Active hardware redundancy Standby sparing technique
-- -> Acho que a 3ª é a menos útil das 3 para o Cruise Control
-- Talvez aplicat ambas TMR e DMR, caso o número de sensores ou resultados válidos seja maior que 2 usa-se TMR, se for igual a 2, recorre-se a DMR.
+	- -> Acho que a 3ª é a menos útil das 3 para o Cruise Control
+- Talvez aplicat ambas TMR e DMR, caso o número de sensores ou resultados válidos seja maior que 2 usa-se TMR, se for igual a 2, recorre-se a DMR. Ou talvez usar antes o Pair-and-a-spare approach?
 #### Information redundancy
 - Existem várias técnicas mas foi recomendado pelo professor usar CRC, visto que é semelhante a hash e pode conseguir conseguir o problema devido a propriedades redundantes do CRC.
 #### Time redundancy
+- Good for transient faults; no protection against permanent faults
 - Re-execução do código parece ser o mais apropriado das opções.
 - A re-execução do código será o código por inteiro ou repetir cada função depois dessa função acabar, haverá diferença?
 - Não percebi a parte do encode.
@@ -56,5 +58,8 @@ differ
 
 ### Importante
 - Dizer talvez no relatório que estas soluções individualmente não são muito tolerantes a falhas, mas sim como um conjunto...
-- Como lidamos com o single point of failure das soluções que usam comparadores.
+- Como lidamos com o single point of failure das soluções que usam comparadores?
+	- Usar comparadores para os comparadores -> outro single point of failure, não pode ser.
 - Soluções que tenham comparadores, para melhor assegurar que um valor está correto, caso hajam diferentes inputs no comparador estes devem estar desempatados, caso contrário não se saberá qual o correto, só se saberá que um deles está incorreto. Ver slides T2b, páginas 45,46.
+- Preferível evitar os erros do que os corrigir
+- Backward error recovery parece uma combinação interessante de checkpointing e n version...
