@@ -1,0 +1,42 @@
+[INFO] 2025-03-31 15:32:41.562 - ClimateControl system initialized at 2025-03-31 15:32:41.562
+[INFO] 2025-03-31 15:32:41.579 - Started test execution with 12 available processors
+[INFO] 2025-03-31 15:32:41.579 - Running TC1 with desired temp: 25, error margin: 3
+[INFO] 2025-03-31 15:32:41.579 - Zone 0: Temperature within desired range. Maintaining fan duty.
+[INFO] 2025-03-31 15:32:41.579 - Zone 0: Temperature within desired range. Maintaining fan duty.
+[INFO] 2025-03-31 15:32:41.579 - Successfully adjusted fan duty cycles for 1 zones.
+[INFO] 2025-03-31 15:32:41.579 - TC1 result: [[0, 0, 0]]
+[INFO] 2025-03-31 15:32:41.579 - Running TC2 with desired temp: 25, error margin: 3
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Successfully adjusted fan duty cycles for 2 zones.
+[INFO] 2025-03-31 15:32:41.587 - TC2 result: [[20, 20], [15, 15]]
+[INFO] 2025-03-31 15:32:41.587 - Running TC3 with desired temp: 25, error margin: 3
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Successfully adjusted fan duty cycles for 2 zones.
+[INFO] 2025-03-31 15:32:41.587 - TC3 result: [[20, 10], [20, 20]]
+[INFO] 2025-03-31 15:32:41.587 - Running TC4 with desired temp: 15, error margin: 3
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature above desired range. Decreasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature within desired range. Maintaining fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature above desired range. Decreasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature within desired range. Maintaining fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Successfully adjusted fan duty cycles for 2 zones.
+[INFO] 2025-03-31 15:32:41.587 - TC4 result: [[0, 0], [0, 0]]
+[INFO] 2025-03-31 15:32:41.587 - Running TC5 with desired temp: 30, error margin: 3
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 0: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Zone 1: Temperature below desired range. Increasing fan duty.
+[INFO] 2025-03-31 15:32:41.587 - Successfully adjusted fan duty cycles for 2 zones.
+[INFO] 2025-03-31 15:32:41.587 - TC5 result: [[100, 80], [100, 10]]
+[INFO] 2025-03-31 15:32:41.587 - Running TC6 with invalid temperature
+[ERROR] 2025-03-31 15:32:41.587 - Temperature value out of realistic range (-20;50) in zone 0: -100
+[INFO] 2025-03-31 15:32:41.587 - TC6 correctly caught invalid temperature: Temperature value out of realistic range (-20;50) in zone 0: -100
+[INFO] 2025-03-31 15:32:41.587 - Running TC7 with invalid duty cycle
+[ERROR] 2025-03-31 15:32:41.595 - Duty cycle out of range (0-100) in zone 0: 150
+[INFO] 2025-03-31 15:32:41.595 - TC7 correctly caught invalid duty cycle: Duty cycle out of range (0-100) in zone 0: 150
+[INFO] 2025-03-31 15:32:41.595 - Test execution completed
