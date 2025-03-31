@@ -5,8 +5,16 @@ public class CruiseControl {
     private static float calculate_acceleration(int current_speed, int[] prev_speed, int set_speed, int max_accel, int error){
 
         float acceleration = 0;
-        float speed_avg = (float)(current_speed + prev_speed[0] + prev_speed[1]) / 3;
+        float speed_avg;
         float speed_diff;
+
+        speed_avg = current_speed;
+
+        for(int i=0; i< prev_speed.length; i++){ // sum all values
+            speed_avg+=prev_speed[i];
+        }
+
+        speed_avg = speed_avg/prev_speed.length+1; // count of previous values plus current speed
         
         // print received values
         System.out.println("current_speed: " + current_speed);
