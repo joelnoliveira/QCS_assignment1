@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
-public class ClimateControlBaselineFault {
+public class ClimateControlFault {
 
     // Constantes para limites de temperatura e duty cycle
     private static final int MIN_TEMP = -20;
@@ -226,47 +226,52 @@ public class ClimateControlBaselineFault {
         int[] temps1 = {23};
         int[] temps2 = {20, 18};
 
-        try {
-            // TC1
+       
+            // Test Case 1
             List<List<Integer>> fans1 = new ArrayList<>();
             fans1.add(Arrays.asList(0, 0, 0));
             logInfo("Running TC1 with desired temp: " + desiredTemp + ", error margin: " + error);
             List<List<Integer>> result1 = adjustFanDuty(desiredTemp, error, temps1, fans1);
             logInfo("TC1 result: " + result1);
+            logInfo("----------");
 
-            // TC2
+            // Test Case 2
             List<List<Integer>> fans2 = new ArrayList<>();
             fans2.add(Arrays.asList(10, 10));
             fans2.add(Arrays.asList(5, 5));
             logInfo("Running TC2 with desired temp: " + desiredTemp + ", error margin: " + error);
             List<List<Integer>> result2 = adjustFanDuty(desiredTemp, error, temps2, fans2);
             logInfo("TC2 result: " + result2);
+            logInfo("----------");
 
-            // TC3
+            // Test Case 3
             List<List<Integer>> fans3 = new ArrayList<>();
             fans3.add(Arrays.asList(10, 0));
             fans3.add(Arrays.asList(0, 0));
             logInfo("Running TC3 with desired temp: " + desiredTemp + ", error margin: " + error);
             List<List<Integer>> result3 = adjustFanDuty(desiredTemp, error, temps2, fans3);
             logInfo("TC3 result: " + result3);
+            logInfo("----------");
 
-            // TC4
+            // Test Case 4 
             List<List<Integer>> fans4 = new ArrayList<>();
             fans4.add(Arrays.asList(10, 0));
             fans4.add(Arrays.asList(0, 0));
             logInfo("Running TC4 with desired temp: 15, error margin: " + error);
             List<List<Integer>> result4 = adjustFanDuty(15, error, temps2, fans4);
             logInfo("TC4 result: " + result4);
+            logInfo("----------");
 
-            // TC5
+            // Test Case 5
             List<List<Integer>> fans5 = new ArrayList<>();
             fans5.add(Arrays.asList(95, 70));
             fans5.add(Arrays.asList(100, 0));
             logInfo("Running TC5 with desired temp: 30, error margin: " + error);
             List<List<Integer>> result5 = adjustFanDuty(30, error, temps2, fans5);
             logInfo("TC5 result: " + result5);
+            logInfo("----------");
             
-            // TC6 - Testar com temperatura inválida
+            // Test Case 6 - Testar com temperatura inválida
             try {
                 int[] invalidTemps = {-100, 200};
                 List<List<Integer>> fans6 = new ArrayList<>();
@@ -275,32 +280,25 @@ public class ClimateControlBaselineFault {
                 logInfo("Running TC6 with invalid temperature");
                 List<List<Integer>> result6 = adjustFanDuty(desiredTemp, error, invalidTemps, fans6);
                 logInfo("TC6 result: " + result6);
+                logInfo("----------");
             } catch (IllegalArgumentException e) {
                 logInfo("TC6 correctly caught invalid temperature: " + e.getMessage());
+                logInfo("----------");
             }
             
-            // TC7 - Testar com duty cycle inválido
+            // Test Case 7 - Testar com duty cycle inválido
             try {
                 List<List<Integer>> fans7 = new ArrayList<>();
                 fans7.add(Arrays.asList(150, 50));
                 logInfo("Running TC7 with invalid duty cycle");
                 List<List<Integer>> result7 = adjustFanDuty(desiredTemp, error, temps1, fans7);
                 logInfo("TC7 result: " + result7);
+                logInfo("----------");
             } catch (IllegalArgumentException e) {
                 logInfo("TC7 correctly caught invalid duty cycle: " + e.getMessage());
+                logInfo("----------");
             }
             
-        } catch (Exception e) {
-            logError("Error in test execution: " + e.getMessage());
-            e.printStackTrace(logWriter);
-        } finally {
-            logInfo("Test execution completed");
-            // Garantir que o arquivo de log seja fechado corretamente
-            if (logWriter != null) {
-                logWriter.close();
-            }
-        }
-        
         System.out.println("Tests completed. Check logs in " + LOG_FILE + " for details.");
     }
 }
