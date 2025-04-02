@@ -27,7 +27,7 @@ differ
 - TMR vs DMR vs Active hardware redundancy Standby sparing technique
 	- -> Acho que a 3ª é a menos útil das 3 para o Cruise Control
 - Talvez aplicat ambas TMR e DMR, caso o número de sensores ou resultados válidos seja maior que 2 usa-se TMR, se for igual a 2, recorre-se a DMR. Ou talvez usar antes o Pair-and-a-spare approach?
-- USAR PAIR AND SPAIR WITH HOT STANDBY??? -> Aguardar resposta do professor
+- USAR PAIR AND SPAIR WITH HOT STANDBY??? -> SIM, MAS SE s]o houver dois sensores usa-se DMR
 #### Information redundancy
 - Existem várias técnicas mas foi recomendado pelo professor usar CRC, visto que é semelhante a hash e pode conseguir conseguir o problema devido a propriedades redundantes do CRC.
 - TENTAR FAZER O CRC
@@ -73,3 +73,7 @@ DIIGO FEZ REDUNDANCIA TEMPORAL, VALIDAÇÃO DE INPUTS E OUPTUS
 
 
 CONSIDERAR FAZER CHEKPOINTING TAMBEM PARA O CODIGO QUE VAI FAZER N VERSION CONTROL.
+
+FAZER FAIL FAST PORQUE ]E MAIS SIMPLES
+
+REPORT which sensors are giving bad values
