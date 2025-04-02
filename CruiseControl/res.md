@@ -31,6 +31,7 @@ differ
 #### Information redundancy
 - Existem várias técnicas mas foi recomendado pelo professor usar CRC, visto que é semelhante a hash e pode conseguir conseguir o problema devido a propriedades redundantes do CRC.
 - TENTAR FAZER O CRC
+- USar crc em vez de hash porque hash é mais pesado e desnhado para ser one way enquanto que crc não
 #### Time redundancy
 - Good for transient faults; no protection against permanent faults
 - Re-execução do código parece ser o mais apropriado das opções.
@@ -77,3 +78,7 @@ CONSIDERAR FAZER CHEKPOINTING TAMBEM PARA O CODIGO QUE VAI FAZER N VERSION CONTR
 FAZER FAIL FAST PORQUE ]E MAIS SIMPLES
 
 REPORT which sensors are giving bad values
+
+Não fazer recuperação de erros no CRC porque isso não existe nativamente no Java e parece complicado de fazer
+
+Fazer uma varíavel e uma replica e um crc da variável, compara-se as duas variáveis se forem iguais, muito bem, se não vê-se qual está correta através do CRC.

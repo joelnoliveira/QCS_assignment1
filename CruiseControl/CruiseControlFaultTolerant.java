@@ -1,10 +1,93 @@
 package CruiseControl;
 
 import java.util.LinkedList;
+import java.util.zip.CRC32;
 public class CruiseControlFaultTolerant {
 
-    
-    private boolean inputChecker(final int minSpeed,final int maxSpeed, final int error, final int maxAccel, final int setSpeed, LinkedList<Integer> preSpeed, final int[] speedSensors){
+    private int currentSpeed;
+    private int currentSpeedReplica, errorReplica, maxAccelReplica, setSpeedReplica, topSpeedReplica;
+    private int[] prevSpeedReplica;
+    private long curentSpeedCRC, errorCRC, maxAccelCRC, setSpeedCRC, topSpeedCRC, prevSpeedCRC;
+
+    private long calculateCRC(int value) {
+        byte[] bytes = new byte[4];
+        CRC32 crc = new CRC32();
+
+        bytes[0] = (byte)(value >> 24); // most significant byte
+        bytes[1] = (byte)(value >> 16);
+        bytes[2] = (byte)(value >> 8);
+        bytes[3] = (byte)(value); // least significant byte
+        
+        crc.update(bytes);
+        return crc.getValue();
+    }
+
+    private long calculateCRC(int[] values) {
+        CRC32 crc = new CRC32();
+        byte[] bytes = new byte[values.length * 4]; // Continuous byte array
+
+        for (int i = 0; i < values.length; i++) {
+            int value = values[i];
+            int baseIndex = i * 4;
+            bytes[baseIndex] = (byte)(value >> 24); // MSB
+            bytes[baseIndex + 1] = (byte)(value >> 16);
+            bytes[baseIndex + 2] = (byte)(value >> 8);
+            bytes[baseIndex + 3] = (byte)(value);   // LSB
+        }
+
+        crc.update(bytes); // Process all bytes at once
+        return crc.getValue();
+    }
+
+    private int checkValues(int val, int valReplica, long valCRC){
+
+        // Check if the value is equal to its replica
+        if(val == valReplica)return val;
+        else{
+            if(calculateCRC(val) == valCRC){
+                valReplica = val;
+                return val;
+            }else{
+                if(calculateCRC(valReplica) == valCRC){
+                    val = valReplica;
+                    return valReplica;
+                }else return -1; // Error: both values are incorrect
+            }
+                
+        }
+    }
+
+    private int[] checkValues(int[] val, int[] valReplica, long valCRC){
+
+        // Check if the value is equal to its replica
+        if(val == valReplica)return val;
+        else{
+            if(calculateCRC(val) == valCRC){
+                valReplica = val;
+                return val;
+            }else{
+                if(calculateCRC(valReplica) == valCRC){
+                    val = valReplica;
+                    return valReplica;
+                }else return null; // Error: both values are incorrect
+            }
+                
+        }
+    }
+
+    /**
+     * Checks the input values for the cruise control system.
+     * @param minSpeed minimum possible speed for cruise control, must be non-negative
+     * @param maxSpeed maximum possible speed for cruise control, must be higher than zero
+     * @param topSpeed maximum possible speed of the car, must be higher than zero
+     * @param error value to be used as a tolerance, must be non-negative
+     * @param maxAccel maximum allowed acceleration, must be higher than zero
+     * @param setSpeed target speed, must be in the range of min and max speed
+     * @param prevSpeed array holding previous speed values
+     * @param speedSensors current speed value from each sensor, must be at least 2 and max 3
+     * @return
+     */
+    private boolean inputChecker(final int minSpeed,final int maxSpeed, final int topSpeed, final int error, final int maxAccel, final int setSpeed, final int[] prevSpeed, final int[] speedSensors){
 
         short badSensorsCount = 0;
         // check for bad inputs
@@ -14,6 +97,10 @@ public class CruiseControlFaultTolerant {
         }
         if(maxSpeed <= 0){
             System.out.println("Error: maxSpeed must be higher than zero");
+            return false;
+        }
+        if(maxSpeed > topSpeed){
+            System.out.println("Error: maxSpeed must be lower than topSpeed");
             return false;
         }
         if(error < 0){
@@ -40,12 +127,12 @@ public class CruiseControlFaultTolerant {
             System.out.println("Error: speedSensors must not be empty");
             return false;
         }
-        if(preSpeed == null){
-            System.out.println("Error: preSpeed must not be null");
+        if(prevSpeed == null){
+            System.out.println("Error: prevSpeed must not be null");
             return false;
         }
-        if(preSpeed.size() == 0){
-            System.out.println("Error: preSpeed must not be empty");
+        if(prevSpeed.length == 0){
+            System.out.println("Error: prevSpeed must not be empty");
             return false;
         }
 
@@ -59,14 +146,6 @@ public class CruiseControlFaultTolerant {
         if(minSpeed >= maxSpeed){
             System.out.println("Error: minSpeed must be lower than maxSpeed");
             return false;
-        }
-
-        // check preSpeed values and delete bad ones
-        for(int i = 0; i < preSpeed.size(); i++){
-            if(preSpeed.get(i) < 0){
-                preSpeed.remove(i);
-                i--;
-            }
         }
 
         // check how many bad sensors are there
@@ -124,9 +203,63 @@ public class CruiseControlFaultTolerant {
         }
     }
 
+    private float calculateAcceleration(final int topSpeed, final int error, final int maxAccel, final int setSpeed, final int[] prevSpeed, final int currentSpeed){
+        float acceleration = 0;
+        float speedAvg;
+        float speedDiff;
+
+        speedAvg = checkValues(currentSpeed, currentSpeedReplica, curentSpeedCRC);
+        if(speedAvg == -1){
+            System.out.println("Error: currentSpeed is corrupted");
+            return 0;
+        }
+
+        if(checkValues(prevSpeed, prevSpeed, currentSpeed)==null){
+            System.out.println("Error: prevSpeed is corrupted");
+            return 0;
+        }
+
+        // TODO: reject values that are negative or bigger than topSpeed
+        for(int i=0; i< prevSpeed.length; i++){ // sum all values
+            speedAvg+=prevSpeed[i];
+        }
+
+        speedAvg = speedAvg/prevSpeed.length+1; // count of previous values plus current speed
+        
+        // print received values
+        // System.out.println("currentSpeed: " + currentSpeed);
+        // System.out.println("prevSpeed: [" + prevSpeed[0] + ", " + prevSpeed[1] + "]");
+        // System.out.println("setSpeed: " + setSpeed);
+        // System.out.println("maxAccel: " + maxAccel);
+        // System.out.println("error: " + error);
+
+        if(checkValues(setSpeed, setSpeedReplica, setSpeedCRC) == -1){
+            System.out.println("Error: setSpeed is corrupted");
+            return 0;
+        }
+        //if abs difference between the average and setSpeed is bigger than the error
+        if (Math.abs(speedAvg - setSpeed) > error){
+
+            speedDiff = setSpeed - currentSpeed;
+            
+            if(checkValues(maxAccel, maxAccelReplica, maxAccelCRC) == -1){
+                System.out.println("Error: maxAccel is corrupted");
+                return 0;
+            }
+            //if the absolute of the difference is bigger than the maxAccel
+            if (Math.abs(speedDiff) > maxAccel)acceleration = maxAccel;
+            else acceleration = speedDiff;
+
+        }
+        System.out.println("Returned acceleration: " + acceleration);
+
+        return acceleration;
+    }
+
     /**
      * @param minSpeed mininum possible speed for cruise control, must be non-negative
      * @param maxSpeed maximum possible speed for cruise control, must be higher than zero
+     * @param topSpeed maximum possible speed of the car, must be higher than zero
      * @param error value to be used as a tolerance, must be non-negative
      * @param maxAccel maximum allowed acceleration, must be higher than zero
      * @param setSpeed target speed, must be in the range of min and max speed
@@ -134,13 +267,29 @@ public class CruiseControlFaultTolerant {
      * @param speedSensors current speed value from each sensor, must be at least 2 and max 3
      * @return acceleration value
      */
-    public float calculateAccelaration(final int minSpeed,final int maxSpeed, final int error, final int maxAccel, final int setSpeed,final int[] preSpeed, final int[] speedSensors){
+    public float cruiseControl(final int minSpeed,final int maxSpeed, final int topSpeed,final int error, final int maxAccel, final int setSpeed,final int[] prevSpeed, final int[] speedSensors){
 
         boolean good;
-        final int currentSpeed;
-        LinkedList<Integer> preSpeedList = new LinkedList<>();
 
-        good = inputChecker(minSpeed, maxSpeed, error, maxAccel, setSpeed, preSpeedList, speedSensors);
+        // create CRC for the input values, no need to create CRC for minSpeed and maxSpeed as they are only needed to check setSpeed
+        topSpeedCRC = calculateCRC(topSpeed);
+        errorCRC = calculateCRC(error);
+        maxAccelCRC = calculateCRC(maxAccel);
+        setSpeedCRC = calculateCRC(setSpeed);
+        prevSpeedCRC = calculateCRC(prevSpeed);
+
+        // create replicas for the input values
+        topSpeedReplica = topSpeed;
+        errorReplica = error;
+        maxAccelReplica = maxAccel;
+        setSpeedReplica = setSpeed;
+        prevSpeedReplica = new int[prevSpeed.length];
+        for(int i = 0; i < prevSpeed.length; i++){
+            prevSpeedReplica[i] = prevSpeed[i];
+        }
+
+        // check the input
+        good = inputChecker(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed, prevSpeed, speedSensors);
         if(!good) {
             return (float)0.0; // No change in speed
         }
@@ -150,7 +299,14 @@ public class CruiseControlFaultTolerant {
             return (float)0.0; // No change in speed
         }
 
-        return (float)1.0;
+        // create CRC and replica for the current speed
+        curentSpeedCRC = calculateCRC(currentSpeed);
+        currentSpeedReplica = currentSpeed;
+
+        return calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
     }
+
+    public static void main(String[] args) {
+        
     
 }
