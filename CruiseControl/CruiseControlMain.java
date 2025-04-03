@@ -1,7 +1,7 @@
 package CruiseControl;
 
+import java.util.concurrent.*;
 import java.util.zip.CRC32;
-
 
 public class CruiseControlMain {
 
@@ -24,43 +24,81 @@ public class CruiseControlMain {
         if (target > MAX_SPEED) return MAX_SPEED - currentSpeed;
         return adjustment;
     }
-
-    public static float adjustAcceleration(int currentSpeed, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
-        if (prevSpeed == null) throw new IllegalArgumentException("prevSpeed não pode ser nulo");
-        if (maxAccel < 0) throw new IllegalArgumentException("maxAccel não pode ser negativo");
-        if (error < 0) throw new IllegalArgumentException("error não pode ser negativo");
-
-        if (setSpeed < MIN_SPEED) setSpeed = MIN_SPEED;
-        if (setSpeed > MAX_SPEED) setSpeed = MAX_SPEED;
-
-        // Chamada às duas versões
-        float resultA = CruiseControlFaultA.computeAcceleration(currentSpeed, prevSpeed, setSpeed, maxAccel, error);
-       //meter a tua versao
-        float resultB = CruiseControlFaultA.computeAcceleration(currentSpeed, prevSpeed, setSpeed, maxAccel, error);
-
+    
+    /**
+     * Ajusta a aceleração do Cruise Control utilizando redundância de hardware.
+     * Recebe um array de 3 sensores e os demais parâmetros necessários.
+     */
+    public static float adjustAcceleration(int[] sensorReadings, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
+        if (sensorReadings == null) throw new IllegalArgumentException("sensorReadings não pode ser nulo.");
+        if (sensorReadings.length != 3) throw new IllegalArgumentException("São necessários exatamente 3 sensores de velocidade.");
+        
+        // Chama a função computeAcceleration que usa os 3 sensores para determinar currentSpeed via votação.
+        float resultA = CruiseControlFaultA.computeAcceleration(sensorReadings, prevSpeed, setSpeed, maxAccel, error);
+        float resultB = CruiseControlFaultA.computeAcceleration(sensorReadings, prevSpeed, setSpeed, maxAccel, error);
+        
         long crcA = calculateCRC(resultA);
         long crcB = calculateCRC(resultB);
-
+        
         if (crcA == crcB) {
+            // Para o clamping, usamos o currentSpeed obtido via votação dos sensores.
+            int currentSpeed = CruiseControlFaultA.getVotedSpeed(sensorReadings);
             return clampSpeed(currentSpeed, resultA);
         } else {
-            System.out.println("⚠️ Divergência entre versões A e B detectada.");
+            System.out.println("⚠️ Divergência entre versões detectada.");
             throw new RuntimeException("Resultados inconsistentes entre versões N-Version.");
         }
     }
-
-    public static void main(String[] args) {
-        int currentSpeed = 100;
-        int[] prevSpeed = {100, 100};
-
-        System.out.println("TC1: " + adjustAcceleration(currentSpeed, prevSpeed, 100, 10, 10));
-        System.out.println("TC2: " + adjustAcceleration(currentSpeed, prevSpeed, 120, 10, 0));
-        System.out.println("TC3: " + adjustAcceleration(currentSpeed, prevSpeed, 80, 20, 0));
-
+    
+    /**
+     * Executa a função de ajuste de aceleração com watchdog timer.
+     * Se a execução exceder o tempo limite, dispara um timeout.
+     */
+    public static float runWithWatchdog(final int[] sensorReadings, final int[] prevSpeed, 
+                                          final int setSpeed, final int maxAccel, final int error, 
+                                          long timeoutMillis) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            adjustAcceleration(100, null, 100, 10, 10);
-        } catch (IllegalArgumentException e) {
-            System.out.println("TC4 passou: " + e.getMessage());
+            Future<Float> future = executor.submit(new Callable<Float>() {
+                public Float call() {
+                    return adjustAcceleration(sensorReadings, prevSpeed, setSpeed, maxAccel, error);
+                }
+            });
+            return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            throw new RuntimeException("Timeout: a execução ultrapassou " + timeoutMillis + " ms.");
+        } catch (Exception e) {
+            throw new RuntimeException("Erro durante a execução: " + e.getMessage());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+    
+    public static void main(String[] args) {
+        // Exemplo de leituras de 3 sensores (redundância de hardware)
+        int[] sensorReadings = {100, 100, 100};  // leituras consistentes
+        int[] prevSpeed = {100, 100};
+        int setSpeed = 100;
+        int maxAccel = 10;
+        int error = 10;
+        long timeoutMillis = 1000;
+        
+        try {
+            System.out.println("TC1: " + runWithWatchdog(sensorReadings, prevSpeed, setSpeed, maxAccel, error, timeoutMillis));
+            
+            // Teste com divergência: um sensor apresenta valor diferente
+            int[] sensorReadings2 = {100, 95, 100};
+            System.out.println("TC2: " + runWithWatchdog(sensorReadings2, prevSpeed, setSpeed, maxAccel, error, timeoutMillis));
+            
+            // Teste com array de sensores inválido (menos de 3 elementos)
+            try {
+                int[] sensorReadingsInvalid = {100, 100};
+                System.out.println("TC3: " + runWithWatchdog(sensorReadingsInvalid, prevSpeed, setSpeed, maxAccel, error, timeoutMillis));
+            } catch (IllegalArgumentException e) {
+                System.out.println("TC3 passou: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            System.out.println("Erro nos testes: " + e.getMessage());
         }
     }
 }
