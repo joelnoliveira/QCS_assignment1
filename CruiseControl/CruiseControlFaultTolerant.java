@@ -23,7 +23,6 @@ public class CruiseControlFaultTolerant {
     }
 
     private void calculateArrayCRCs(int[] values, long[] valuesCRCs) {
-        CRC32 crc = new CRC32();
         
         for(int i = 0; i < values.length; i++) {
             valuesCRCs[i] = calculateCRC(values[i]);
@@ -161,7 +160,7 @@ public class CruiseControlFaultTolerant {
      * @param speedSensors current speed value from each sensor, must be at least 2 and max 3
      * @return correct current speed value or -1 if the correct value cannot be determined
      */
-    private int getCurrentSpeed(final int[] speedSensors){
+    private int voter(final int[] speedSensors, String type){
     
         if (speedSensors.length == 3) { // Perform Pair-and-a-spare approach
             
@@ -169,13 +168,13 @@ public class CruiseControlFaultTolerant {
              return speedSensors[0];
             }else {
                 if(speedSensors[0] == speedSensors[2]){
-                    System.out.println("Warning: value 1 gave a faulty value");
+                    System.out.printf("Warning: %s 1 gave a faulty value\n",type);
                     return speedSensors[0];
                 }else if(speedSensors[1] == speedSensors[2]){
-                    System.out.println("Warning: value 0 gave a faulty value");
+                    System.out.printf("Warning: %s 0 gave a faulty value\n",type);
                     return speedSensors[1];
                 }else{
-                    System.out.println("Error: all 3 values gave different values");
+                    System.out.printf("Error: all 3 %s gave different values\n",type);
                     return -1;
                 }
             }
@@ -184,7 +183,7 @@ public class CruiseControlFaultTolerant {
             if(speedSensors[0] == speedSensors[1]){
                 return speedSensors[0];
             }else{
-                System.out.println("Error: All 2 sensors gave different values");
+                System.out.printf("Error: All 2 %s gave different values\n", type);
                 return -1;
             }
         }
@@ -202,7 +201,6 @@ public class CruiseControlFaultTolerant {
             return 0;
         }
 
-        // TODO: reject values that are negative or bigger than topSpeed
         for(int i=0; i< prevSpeed.length; i++){ // sum all values
 
             if(checkValues(topSpeed, topSpeedReplica, topSpeedCRC) == -1){
@@ -296,7 +294,7 @@ public class CruiseControlFaultTolerant {
             return (float)0.0; // No change in speed
         }
 
-        currentSpeed = getCurrentSpeed(speedSensors);
+        currentSpeed = voter(speedSensors, "speedSensor");
         if(currentSpeed == -1){
             return (float)0.0; // No change in speed
         }
@@ -308,7 +306,10 @@ public class CruiseControlFaultTolerant {
         return calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
     }
 
-    public static void main(String[] args) {
+    public void runner() {
+
+
+
         
     }
 }
