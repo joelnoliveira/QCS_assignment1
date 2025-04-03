@@ -41,6 +41,24 @@ public class CruiseControlFaultA {
         }
     }
 
+    // Novo método: obtém a velocidade a partir de 3 sensores (hardware redundancy)
+    public static int getVotedSpeed(int[] sensors) {
+        if (sensors == null) {
+            throw new IllegalArgumentException("As leituras dos sensores não podem ser nulas.");
+        }
+        if (sensors.length != 3) {
+            throw new IllegalArgumentException("São necessários exatamente 3 sensores de velocidade.");
+        }
+        // Votação: se pelo menos dois sensores concordarem, esse é o valor adotado.
+        if (sensors[0] == sensors[1]) return sensors[0];
+        else if (sensors[0] == sensors[2]) return sensors[0];
+        else if (sensors[1] == sensors[2]) return sensors[1];
+        else {
+            System.out.println("Warning: Divergência entre os 3 sensores. Utilizando o valor do primeiro sensor.");
+            return sensors[0];
+        }
+    }
+
     // Função "core" que realiza o cálculo da aceleração sem redundância
     private static float computeAccelerationCore(int currentSpeed, int setSpeed, int maxAccel, int error) {
         int lowerBound = setSpeed - error;
@@ -59,9 +77,16 @@ public class CruiseControlFaultA {
     /**
      * Função otimizada com hot spare (pair and spare "quente") e
      * verificação da integridade dos inputs críticos usando CRC.
+     * Agora, a função recebe um array de 3 sensores para determinar a velocidade atual.
      */
-    public static float computeAcceleration(int currentSpeed, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
+    public static float computeAcceleration(int[] sensorReadings, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
         // Validação de inputs essenciais
+        if (sensorReadings == null) {
+            throw new IllegalArgumentException("Array de leituras dos sensores não pode ser nulo.");
+        }
+        if (sensorReadings.length != 3) {
+            throw new IllegalArgumentException("São necessários exatamente 3 sensores de velocidade.");
+        }
         if (prevSpeed == null) {
             throw new IllegalArgumentException("Array de velocidades anteriores não pode ser nulo.");
         }
@@ -71,9 +96,9 @@ public class CruiseControlFaultA {
         if (error < 0) {
             throw new IllegalArgumentException("Margem de erro não pode ser negativa: " + error);
         }
-        if (currentSpeed < 0) {
-            throw new IllegalArgumentException("Velocidade atual não pode ser negativa: " + currentSpeed);
-        }
+        
+        // Obtém a velocidade atual através da votação dos 3 sensores
+        int currentSpeed = getVotedSpeed(sensorReadings);
         
         // Ajusta setSpeed para estar dentro dos limites realistas
         if (setSpeed < MIN_SPEED) {
@@ -131,33 +156,42 @@ public class CruiseControlFaultA {
     }
 
     public static void main(String[] args) {
-        int currentSpeed = 100;
+        int[] sensorReadings = {100, 100, 100};  // valores consistentes
         int[] prevSpeed = {100, 100};
+        int setSpeed = 100;
+        int maxAccel = 10;
+        int error = 10;
 
         // Test Cases com a versão otimizada com hot spare e verificação de inputs
-        System.out.println("TC1: " + computeAcceleration(currentSpeed, prevSpeed, 100, 10, 10));
-        System.out.println("TC2: " + computeAcceleration(currentSpeed, prevSpeed, 100, 10, 0));
-        System.out.println("TC3: " + computeAcceleration(currentSpeed, prevSpeed, 120, 10, 0));
-        System.out.println("TC4: " + computeAcceleration(currentSpeed, prevSpeed, 80, 30, 0));
-        System.out.println("TC5: " + computeAcceleration(currentSpeed, prevSpeed, 80, 10, 21));
+        System.out.println("TC1: " + computeAcceleration(sensorReadings, prevSpeed, 100, 10, 10));
+        System.out.println("TC2: " + computeAcceleration(sensorReadings, prevSpeed, 100, 10, 0));
+        System.out.println("TC3: " + computeAcceleration(sensorReadings, prevSpeed, 120, 10, 0));
+        System.out.println("TC4: " + computeAcceleration(sensorReadings, prevSpeed, 80, 30, 0));
+        System.out.println("TC5: " + computeAcceleration(sensorReadings, prevSpeed, 80, 10, 21));
 
         // Exemplos de testes com inputs inválidos
         try {
-            System.out.println("TC6: " + computeAcceleration(100, null, 100, 10, 10));
+            System.out.println("TC6: " + computeAcceleration(sensorReadings, null, 100, 10, 10));
         } catch (IllegalArgumentException e) {
             System.out.println("TC6 com erro: " + e.getMessage());
         }
         try {
-            System.out.println("TC7: " + computeAcceleration(100, new int[]{100, 100}, 100, -10, 10));
+            System.out.println("TC7: " + computeAcceleration(sensorReadings, new int[]{100, 100}, 100, -10, 10));
         } catch (IllegalArgumentException e) {
             System.out.println("TC7 com erro: " + e.getMessage());
         }
         try {
-            System.out.println("TC8: " + computeAcceleration(100, new int[]{100, 100}, 100, 10, -10));
+            System.out.println("TC8: " + computeAcceleration(sensorReadings, new int[]{100, 100}, 100, 10, -10));
         } catch (IllegalArgumentException e) {
             System.out.println("TC8 com erro: " + e.getMessage());
         }
-        System.out.println("TC9: " + computeAcceleration(currentSpeed, prevSpeed, 10, 10, 5));
-        System.out.println("TC10: " + computeAcceleration(currentSpeed, prevSpeed, 150, 10, 5));
+        System.out.println("TC9: " + computeAcceleration(sensorReadings, prevSpeed, 10, 10, 5));
+        System.out.println("TC10: " + computeAcceleration(sensorReadings, prevSpeed, 150, 10, 5));
+        try {
+            int[] sensorReadingsInvalid = {100, 100}; // menos que 3 sensores
+            System.out.println("TC11: " + computeAcceleration(sensorReadingsInvalid, prevSpeed, 100, 10, 10));
+        } catch (RuntimeException e) {
+            System.out.println("TC11 com erro: " + e.getMessage());
+        }
     }
 }
