@@ -215,7 +215,7 @@ public class CruiseControlFaultTolerant {
             }
             //otherwise, print a warning
             else{
-                System.out.println("Warning: prevSpeed had a bad value and was discarded");
+                // System.out.println("Warning: prevSpeed had a bad value and was discarded");
             }
         }
 
@@ -303,13 +303,26 @@ public class CruiseControlFaultTolerant {
         curentSpeedCRC = calculateCRC(currentSpeed);
         currentSpeedReplica = currentSpeed;
 
-        return calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
-    }
+        float result0, result1, result2;
+        result0 = calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
+        System.out.println("Version B result0: " + result0);
+        result1 = calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
+        System.out.println("Version B result1: " + result1);
 
-    public void runner() {
 
-
-
-        
+        if(result0 == result1){
+            return result0;
+        }else{ // else check the third result
+            result2 = calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
+            System.out.println("Version B result2: " + result1);
+            if(result0 == result2){
+                return result0;
+            }else if(result1 == result2){
+                return result1;
+            }else{
+                System.out.println("Error: all 3 results are different");
+                return (float)0.0; // No change in speed
+            }
+        } 
     }
 }
