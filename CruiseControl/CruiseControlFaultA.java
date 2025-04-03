@@ -1,11 +1,13 @@
 package CruiseControl;
 
-import java.io.PrintWriter;
 import java.util.zip.CRC32;
-
 
 public class CruiseControlFaultA {
 
+    private static final int MIN_SPEED = 30;
+    private static final int MAX_SPEED = 130;
+
+    // Calcula o CRC32 para um float (para outputs)
     private static long calculateCRC(float value) {
         CRC32 crc = new CRC32();
         int bits = Float.floatToIntBits(value);
@@ -15,12 +17,51 @@ public class CruiseControlFaultA {
         crc.update(bits & 0xFF);
         return crc.getValue();
     }
+    
+    // Calcula o CRC32 para um int (para inputs)
+    private static long calculateCRC(int value) {
+        CRC32 crc = new CRC32();
+        crc.update((value >> 24) & 0xFF);
+        crc.update((value >> 16) & 0xFF);
+        crc.update((value >> 8) & 0xFF);
+        crc.update(value & 0xFF);
+        return crc.getValue();
+    }
+    
+    // Verifica a integridade de um valor inteiro, comparando-o com a sua réplica e o CRC armazenado.
+    private static int checkValue(int value, int replica, long storedCRC) {
+        if (value == replica) {
+            return value;
+        } else if (calculateCRC(value) == storedCRC) {
+            return value;
+        } else if (calculateCRC(replica) == storedCRC) {
+            return replica;
+        } else {
+            throw new RuntimeException("Valor crítico corrompido.");
+        }
+    }
 
-    private static final int MIN_SPEED = 30;
-    private static final int MAX_SPEED = 130;
+    // Função "core" que realiza o cálculo da aceleração sem redundância
+    private static float computeAccelerationCore(int currentSpeed, int setSpeed, int maxAccel, int error) {
+        int lowerBound = setSpeed - error;
+        int upperBound = setSpeed + error;
+        if (currentSpeed >= lowerBound && currentSpeed <= upperBound) {
+            return 0.0f;
+        } else if (currentSpeed < lowerBound) {
+            int diff = lowerBound - currentSpeed;
+            return (diff < maxAccel) ? diff : maxAccel;
+        } else { // currentSpeed > upperBound
+            int diff = currentSpeed - upperBound;
+            return (diff < maxAccel) ? -diff : -maxAccel;
+        }
+    }
 
-    public static float adjustAcceleration(int currentSpeed, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
-        // Validação dos inputs
+    /**
+     * Função otimizada com hot spare (pair and spare "quente") e
+     * verificação da integridade dos inputs críticos usando CRC.
+     */
+    public static float computeAcceleration(int currentSpeed, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
+        // Validação de inputs essenciais
         if (prevSpeed == null) {
             throw new IllegalArgumentException("Array de velocidades anteriores não pode ser nulo.");
         }
@@ -30,137 +71,93 @@ public class CruiseControlFaultA {
         if (error < 0) {
             throw new IllegalArgumentException("Margem de erro não pode ser negativa: " + error);
         }
+        if (currentSpeed < 0) {
+            throw new IllegalArgumentException("Velocidade atual não pode ser negativa: " + currentSpeed);
+        }
+        
+        // Ajusta setSpeed para estar dentro dos limites realistas
         if (setSpeed < MIN_SPEED) {
             setSpeed = MIN_SPEED;
         } else if (setSpeed > MAX_SPEED) {
             setSpeed = MAX_SPEED;
         }
+        
+        // Replicação e verificação dos inputs críticos
+        int setSpeedReplica = setSpeed;
+        long setSpeedCRC = calculateCRC(setSpeed);
+        setSpeed = checkValue(setSpeed, setSpeedReplica, setSpeedCRC);
+        
+        int maxAccelReplica = maxAccel;
+        long maxAccelCRC = calculateCRC(maxAccel);
+        maxAccel = checkValue(maxAccel, maxAccelReplica, maxAccelCRC);
+        
+        int errorReplica = error;
+        long errorCRC = calculateCRC(error);
+        error = checkValue(error, errorReplica, errorCRC);
 
-        // Execução redundante: cálculo feito duas vezes para verificação de consistência
-        float result1 = computeAcceleration(currentSpeed, prevSpeed, setSpeed, maxAccel, error);
-        float result1Copy = result1; // Variável redundante
-       
-        float result2 = computeAcceleration(currentSpeed, prevSpeed, setSpeed, maxAccel, error);
-        float result2Copy = result2; // Variável redundante
-        // Verificação de consistência da variável redundante
-        if (result1 != result1Copy) {
-            throw new RuntimeException("Inconsistência detetada entre variável original e redundante.");
+        // --- Hot Spare: Executa as três cópias "quentes" ---
+        float primary = computeAccelerationCore(currentSpeed, setSpeed, maxAccel, error);
+        float backup  = computeAccelerationCore(currentSpeed, setSpeed, maxAccel, error);
+        float spare   = computeAccelerationCore(currentSpeed, setSpeed, maxAccel, error);
+
+        long crcPrimary = calculateCRC(primary);
+        long crcBackup  = calculateCRC(backup);
+        long crcSpare   = calculateCRC(spare);
+
+        float chosenResult;
+        // Votação por maioria: se duas cópias tiverem o mesmo CRC, essa é a escolhida.
+        if (crcPrimary == crcBackup || crcPrimary == crcSpare) {
+            chosenResult = primary;
+        } else if (crcBackup == crcSpare) {
+            chosenResult = backup;
+        } else {
+            throw new RuntimeException("Erro: resultados inconsistentes entre hot spare e os módulos de pair.");
         }
 
-        // Verificação de consistência da variável redundante
-        if (result2 != result2Copy) {
-            throw new RuntimeException("Inconsistência detetada entre variável original e redundante.");
+        // Validação de output: a aceleração deve estar dentro de -maxAccel e +maxAccel.
+        if (chosenResult < -maxAccel || chosenResult > maxAccel) {
+            throw new RuntimeException("Erro: aceleração fora dos limites físicos permitidos. Valor: " + chosenResult);
         }
 
-        // Verificação de consistência usando CRC
-        long crc1 = calculateCRC(result1);
-        long crc2 = calculateCRC(result2);
-
-        if (crc1 != crc2) {
-            System.out.println("⚠️ Inconsistência detectada via CRC! crc1=" + crc1 + ", crc2=" + crc2);
-            // Temos de decidir o que fazer em caso de inconsistência.
-            // Aqui, apenas lançamos uma exceção, mas isso pode ser ajustado conforme necessário.
-        }
-
-        // Ajusta para garantir que a velocidade alvo (currentSpeed + aceleração) permaneça entre MIN_SPEED e MAX_SPEED
-        float targetSpeed = currentSpeed + result1;
+        // Ajuste final para garantir que a velocidade alvo (currentSpeed + aceleração) esteja entre MIN_SPEED e MAX_SPEED.
+        float targetSpeed = currentSpeed + chosenResult;
         if (targetSpeed < MIN_SPEED) {
-            result1 = MIN_SPEED - currentSpeed;
+            chosenResult = MIN_SPEED - currentSpeed;
         } else if (targetSpeed > MAX_SPEED) {
-            result1 = MAX_SPEED - currentSpeed;
+            chosenResult = MAX_SPEED - currentSpeed;
         }
 
-        return result1;
-    }
-
-    public static float computeAcceleration(int currentSpeed, int[] prevSpeed, int setSpeed, int maxAccel, int error) {
-        try {
-            int lowerBound = setSpeed - error;
-            int upperBound = setSpeed + error;
-
-            // Se a velocidade atual está dentro da faixa aceitável, retorna 0
-            if (currentSpeed >= lowerBound && currentSpeed <= upperBound) {
-                return 0;
-            }
-
-            // Se a velocidade atual está abaixo do limite inferior, acelera
-            if (currentSpeed < lowerBound) {
-                int diff = lowerBound - currentSpeed;
-                int accelMagnitude = (diff < maxAccel) ? diff : maxAccel;
-                return accelMagnitude;
-            }
-
-            // Se a velocidade atual está acima do limite superior, desacelera (valor negativo)
-            int diff = currentSpeed - upperBound;
-            int decelMagnitude = (diff < maxAccel) ? diff : maxAccel;
-            return -decelMagnitude;
-        } catch (Exception e) {
-            throw new RuntimeException("Erro no cálculo da aceleração: " + e.getMessage());
-        }
+        return chosenResult;
     }
 
     public static void main(String[] args) {
-        // Test Case 1
         int currentSpeed = 100;
         int[] prevSpeed = {100, 100};
-        int setSpeed1 = 100;
-        int maxAccel1 = 10;
-        int error1 = 10;
-        System.out.println("TC1: " + adjustAcceleration(currentSpeed, prevSpeed, setSpeed1, maxAccel1, error1));
 
-        // Test Case 2
-        int setSpeed2 = 100;
-        int maxAccel2 = 10;
-        int error2 = 0;
-        System.out.println("TC2: " + adjustAcceleration(currentSpeed, prevSpeed, setSpeed2, maxAccel2, error2));
+        // Test Cases com a versão otimizada com hot spare e verificação de inputs
+        System.out.println("TC1: " + computeAcceleration(currentSpeed, prevSpeed, 100, 10, 10));
+        System.out.println("TC2: " + computeAcceleration(currentSpeed, prevSpeed, 100, 10, 0));
+        System.out.println("TC3: " + computeAcceleration(currentSpeed, prevSpeed, 120, 10, 0));
+        System.out.println("TC4: " + computeAcceleration(currentSpeed, prevSpeed, 80, 30, 0));
+        System.out.println("TC5: " + computeAcceleration(currentSpeed, prevSpeed, 80, 10, 21));
 
-        // Test Case 3
-        int setSpeed3 = 120;
-        int maxAccel3 = 10;
-        int error3 = 0;
-        System.out.println("TC3: " + adjustAcceleration(currentSpeed, prevSpeed, setSpeed3, maxAccel3, error3));
-
-        // Test Case 4
-        int setSpeed4 = 80;
-        int maxAccel4 = 30;
-        int error4 = 0;
-        System.out.println("TC4: " + adjustAcceleration(currentSpeed, prevSpeed, setSpeed4, maxAccel4, error4));
-
-        // Test Case 5
-        int setSpeed5 = 80;
-        int maxAccel5 = 10;
-        int error5 = 21;
-        System.out.println("TC5: " + adjustAcceleration(currentSpeed, prevSpeed, setSpeed5, maxAccel5, error5));
-
-        // Test Case 6 prevSpeed nulo
+        // Exemplos de testes com inputs inválidos
         try {
-            System.out.println("TC6: " + adjustAcceleration(100, null, 100, 10, 10));
+            System.out.println("TC6: " + computeAcceleration(100, null, 100, 10, 10));
         } catch (IllegalArgumentException e) {
             System.out.println("TC6 com erro: " + e.getMessage());
         }
-
-        // Test Case 7 maxAccel negativo
         try {
-            System.out.println("TC7: " + adjustAcceleration(100, new int[]{100, 100}, 100, -10, 10));
+            System.out.println("TC7: " + computeAcceleration(100, new int[]{100, 100}, 100, -10, 10));
         } catch (IllegalArgumentException e) {
             System.out.println("TC7 com erro: " + e.getMessage());
         }
-
-        // Test Case 8 error negativo
         try {
-            System.out.println("TC8: " + adjustAcceleration(100, new int[]{100, 100}, 100, 10, -10));
+            System.out.println("TC8: " + computeAcceleration(100, new int[]{100, 100}, 100, 10, -10));
         } catch (IllegalArgumentException e) {
             System.out.println("TC8 com erro: " + e.getMessage());
         }
-
-        // Test Case 9 setSpeed inferior ao mínimo
-        int setSpeedLow = 10;
-        System.out.println("TC9: " + adjustAcceleration(currentSpeed, prevSpeed, setSpeedLow, 10, 5));
-
-        // Test Case 10 setSpeed superior ao máximo
-        int setSpeedHigh = 150;
-        System.out.println("TC10: " + adjustAcceleration(currentSpeed, prevSpeed, setSpeedHigh, 10, 5));
-
+        System.out.println("TC9: " + computeAcceleration(currentSpeed, prevSpeed, 10, 10, 5));
+        System.out.println("TC10: " + computeAcceleration(currentSpeed, prevSpeed, 150, 10, 5));
     }
 }
-
