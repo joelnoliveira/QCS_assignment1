@@ -1,13 +1,13 @@
 package CruiseControl;
 
-import java.util.LinkedList;
 import java.util.zip.CRC32;
 public class CruiseControlFaultTolerant {
 
     private int currentSpeed;
     private int currentSpeedReplica, errorReplica, maxAccelReplica, setSpeedReplica, topSpeedReplica;
     private int[] prevSpeedReplica;
-    private long curentSpeedCRC, errorCRC, maxAccelCRC, setSpeedCRC, topSpeedCRC, prevSpeedCRC;
+    private long curentSpeedCRC, errorCRC, maxAccelCRC, setSpeedCRC, topSpeedCRC;
+    private long [] prevSpeedCRC;
 
     private long calculateCRC(int value) {
         byte[] bytes = new byte[4];
@@ -22,21 +22,12 @@ public class CruiseControlFaultTolerant {
         return crc.getValue();
     }
 
-    private long calculateCRC(int[] values) {
+    private void calculateArrayCRCs(int[] values, long[] valuesCRCs) {
         CRC32 crc = new CRC32();
-        byte[] bytes = new byte[values.length * 4]; // Continuous byte array
-
-        for (int i = 0; i < values.length; i++) {
-            int value = values[i];
-            int baseIndex = i * 4;
-            bytes[baseIndex] = (byte)(value >> 24); // MSB
-            bytes[baseIndex + 1] = (byte)(value >> 16);
-            bytes[baseIndex + 2] = (byte)(value >> 8);
-            bytes[baseIndex + 3] = (byte)(value);   // LSB
+        
+        for(int i = 0; i < values.length; i++) {
+            valuesCRCs[i] = calculateCRC(values[i]);
         }
-
-        crc.update(bytes); // Process all bytes at once
-        return crc.getValue();
     }
 
     private int checkValues(int val, int valReplica, long valCRC){
@@ -57,23 +48,23 @@ public class CruiseControlFaultTolerant {
         }
     }
 
-    private int[] checkValues(int[] val, int[] valReplica, long valCRC){
+    private int checkValues(int[] val, int[] valReplica, long[] valCRC, int index){
 
         // Check if the value is equal to its replica
-        if(val == valReplica)return val;
+        if(val[index] == valReplica[index])return val[index];
         else{
-            if(calculateCRC(val) == valCRC){
-                valReplica = val;
-                return val;
+            if(calculateCRC(val[index]) == valCRC[index]){
+                valReplica[index] = val[index];
+                return val[index];
             }else{
-                if(calculateCRC(valReplica) == valCRC){
-                    val = valReplica;
-                    return valReplica;
-                }else return null; // Error: both values are incorrect
-            }
-                
+                if(calculateCRC(valReplica[index]) == valCRC[index]){
+                    val[index] = valReplica[index];
+                    return valReplica[index];
+                }else return -1; // Error: both values are incorrect or crc is corrupted
+            }     
         }
     }
+
 
     /**
      * Checks the input values for the cruise control system.
@@ -131,10 +122,6 @@ public class CruiseControlFaultTolerant {
             System.out.println("Error: prevSpeed must not be null");
             return false;
         }
-        if(prevSpeed.length == 0){
-            System.out.println("Error: prevSpeed must not be empty");
-            return false;
-        }
 
         // check if number of sensors >= 2
         if(speedSensors.length < 2 || speedSensors.length > 3){
@@ -182,13 +169,13 @@ public class CruiseControlFaultTolerant {
              return speedSensors[0];
             }else {
                 if(speedSensors[0] == speedSensors[2]){
-                    System.out.println("Warning: sensor 1 gave a faulty value");
+                    System.out.println("Warning: value 1 gave a faulty value");
                     return speedSensors[0];
                 }else if(speedSensors[1] == speedSensors[2]){
-                    System.out.println("Warning: sensor 0 gave a faulty value");
+                    System.out.println("Warning: value 0 gave a faulty value");
                     return speedSensors[1];
                 }else{
-                    System.out.println("Error: all 3 sensors gave different values");
+                    System.out.println("Error: all 3 values gave different values");
                     return -1;
                 }
             }
@@ -207,6 +194,7 @@ public class CruiseControlFaultTolerant {
         float acceleration = 0;
         float speedAvg;
         float speedDiff;
+        int counter = 1;
 
         speedAvg = checkValues(currentSpeed, currentSpeedReplica, curentSpeedCRC);
         if(speedAvg == -1){
@@ -214,17 +202,26 @@ public class CruiseControlFaultTolerant {
             return 0;
         }
 
-        if(checkValues(prevSpeed, prevSpeed, currentSpeed)==null){
-            System.out.println("Error: prevSpeed is corrupted");
-            return 0;
-        }
-
         // TODO: reject values that are negative or bigger than topSpeed
         for(int i=0; i< prevSpeed.length; i++){ // sum all values
-            speedAvg+=prevSpeed[i];
+
+            if(checkValues(topSpeed, topSpeedReplica, topSpeedCRC) == -1){
+                System.out.println("Error: topSpeed is corrupted");
+                return 0;
+            }
+            prevSpeed[i] = checkValues(prevSpeed, prevSpeedReplica, prevSpeedCRC, i); // check the validity of the value
+            // check if the value is positive and lower than topSpeed
+            if((prevSpeed[i] >= 0 && prevSpeed[i] <= topSpeed)){
+                speedAvg+=prevSpeed[i];
+                counter++;
+            }
+            //otherwise, print a warning
+            else{
+                System.out.println("Warning: prevSpeed had a bad value and was discarded");
+            }
         }
 
-        speedAvg = speedAvg/prevSpeed.length+1; // count of previous values plus current speed
+        speedAvg = speedAvg/counter; // calculate the average
         
         // print received values
         // System.out.println("currentSpeed: " + currentSpeed);
@@ -235,6 +232,10 @@ public class CruiseControlFaultTolerant {
 
         if(checkValues(setSpeed, setSpeedReplica, setSpeedCRC) == -1){
             System.out.println("Error: setSpeed is corrupted");
+            return 0;
+        }
+        if(checkValues(error, errorReplica, errorCRC) == -1){
+            System.out.println("Error: error is corrupted");
             return 0;
         }
         //if abs difference between the average and setSpeed is bigger than the error
@@ -270,13 +271,14 @@ public class CruiseControlFaultTolerant {
     public float cruiseControl(final int minSpeed,final int maxSpeed, final int topSpeed,final int error, final int maxAccel, final int setSpeed,final int[] prevSpeed, final int[] speedSensors){
 
         boolean good;
+        prevSpeedCRC = new long[prevSpeed.length];
 
         // create CRC for the input values, no need to create CRC for minSpeed and maxSpeed as they are only needed to check setSpeed
         topSpeedCRC = calculateCRC(topSpeed);
         errorCRC = calculateCRC(error);
         maxAccelCRC = calculateCRC(maxAccel);
         setSpeedCRC = calculateCRC(setSpeed);
-        prevSpeedCRC = calculateCRC(prevSpeed);
+        calculateArrayCRCs(prevSpeed, prevSpeedCRC);
 
         // create replicas for the input values
         topSpeedReplica = topSpeed;

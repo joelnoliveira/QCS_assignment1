@@ -82,3 +82,7 @@ REPORT which sensors are giving bad values
 Não fazer recuperação de erros no CRC porque isso não existe nativamente no Java e parece complicado de fazer
 
 Fazer uma varíavel e uma replica e um crc da variável, compara-se as duas variáveis se forem iguais, muito bem, se não vê-se qual está correta através do CRC.
+
+No CRC que estava a fazer para os arrays se um valor fosse corrompido descartava-se o array, agora só se corrige o valor errado, se não der para corrigir descarta-se o valor
+
+Não pus CRC on counter para a média porque se fizesse sentido por aí também fazia sentido por nos for loops
