@@ -32,6 +32,7 @@ differ
 - Existem várias técnicas mas foi recomendado pelo professor usar CRC, visto que é semelhante a hash e pode conseguir conseguir o problema devido a propriedades redundantes do CRC.
 - TENTAR FAZER O CRC
 - USar crc em vez de hash porque hash é mais pesado e desnhado para ser one way enquanto que crc não
+- Replicar variáveis.
 #### Time redundancy
 - Good for transient faults; no protection against permanent faults
 - Re-execução do código parece ser o mais apropriado das opções.
@@ -44,6 +45,7 @@ differ
 	- Não sei se faz sentido implementar compatibility check.
 	- N-version program
 - FAZER CONSISTENCY CHECK E N-VERSION PROGRAMMING
+- consistency verificando o alcaçe das variáveis
 
 
 

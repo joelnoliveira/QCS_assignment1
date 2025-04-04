@@ -1,7 +1,7 @@
 package CruiseControl;
 
 import java.util.zip.CRC32;
-public class CruiseControlFaultTolerantB {
+public class CruiseControlFaultTolerant {
 
     private int currentSpeed;
     private int currentSpeedReplica, errorReplica, maxAccelReplica, setSpeedReplica, topSpeedReplica;
@@ -248,7 +248,7 @@ public class CruiseControlFaultTolerantB {
             else acceleration = speedDiff;
 
         }
-        System.out.println("Returned acceleration: " + acceleration);
+        // System.out.println("Returned acceleration: " + acceleration);
 
         return acceleration;
     }
@@ -303,16 +303,16 @@ public class CruiseControlFaultTolerantB {
 
         float result0, result1, result2;
         result0 = calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
-        System.out.println("Version B result0: " + result0);
+        System.out.println("Fault Tolerant Version result0: " + result0);
         result1 = calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
-        System.out.println("Version B result1: " + result1);
+        System.out.println("Fault Tolerant Version result1: " + result1);
 
 
         if(result0 == result1){
             return result0;
         }else{ // else check the third result
             result2 = calculateAcceleration(topSpeed, error, maxAccel, setSpeed, prevSpeed, currentSpeed);
-            System.out.println("Version B result2: " + result1);
+            System.out.println("Fault Tolerant Version result2: " + result1);
             if(result0 == result2){
                 return result0;
             }else if(result1 == result2){

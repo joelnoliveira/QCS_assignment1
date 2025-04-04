@@ -8,18 +8,20 @@ import java.util.concurrent.TimeoutException;
 
 public class MainCruiseControl {
     
-    private static CruiseControlFaultTolerantA cruiseControlA = new CruiseControlFaultTolerantA();
-    private static CruiseControlFaultTolerantB cruiseControlFaultTolerantB = new CruiseControlFaultTolerantB();
+    private static CruiseControlBaseline baseline = new CruiseControlBaseline();
+    private static CruiseControlFaultTolerant faultTolerant = new CruiseControlFaultTolerant();
 
     private static float nVersionProgramming(final int minSpeed,final int maxSpeed, final int topSpeed,final int error, final int maxAccel, final int setSpeed,final int[] prevSpeed, final int[] speedSensors){
-        float versionA, versionB;
-        // run version A and Version B and compare results
-        versionA = cruiseControlA.computeAcceleration(speedSensors, prevSpeed, setSpeed, maxAccel, error);
+        float result0, result1;
+        // run the 2 versions of the cruise control
+        result0 = baseline.calculateAcceleration(speedSensors[0], prevSpeed, setSpeed, maxAccel, error);
+        result1 = faultTolerant.cruiseControl(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed, prevSpeed, speedSensors);
 
-        versionB = cruiseControlFaultTolerantB.cruiseControl(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed, prevSpeed, speedSensors);
-
-        if (versionA==versionB)return versionA;
-        else return (float) 0.0; // No acceleration
+        if (result0==result1)return result0;
+        else {
+            System.out.println("Error: The two versions of the cruise control returned different results.");
+            return (float) 0.0; // No acceleration
+        }
     }
 
     private static float watchDog(final int minSpeed, final int maxSpeed, final int topSpeed, final int error, final int maxAccel, final int setSpeed, final int[] prevSpeed, final int[] speedSensors, long timeoutMillis) {
@@ -61,7 +63,7 @@ public class MainCruiseControl {
         maxAccel = 10;
         error = 10;
 
-        System.out.println("final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+        System.out.println("Test 1 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
 
         // Test Case 2
         sensors[0] = 100;
@@ -72,7 +74,7 @@ public class MainCruiseControl {
         maxAccel = 10;
         error = 5;
 
-        System.out.println("final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+        System.out.println("Test 2 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
         
 
         /// Test Case 3
@@ -84,7 +86,7 @@ public class MainCruiseControl {
         maxAccel = 10;
         error = 0;
 
-        System.out.println("final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+        System.out.println("Test 3 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
         
 
         // Test Case 4
@@ -96,7 +98,7 @@ public class MainCruiseControl {
         maxAccel = 30;
         error = 0;
 
-        System.out.println("final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+        System.out.println("Test 4 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
         
 
         // Test Case 5
@@ -108,9 +110,53 @@ public class MainCruiseControl {
         maxAccel = 10;
         error = 21;
 
-        System.out.println("final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+        System.out.println("Test 5 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
 
         System.out.println("all done");
+
+        // Test Case 6 one bad sensor
+        sensors[0] = 100;
+        sensors[1] = 1;
+        sensors[2] = 100;
+        prevSpeed = new int[]{100, 100};
+        setSpeed = 80;
+        maxAccel = 10;
+        error = 21;
+        System.out.println("Test 6 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+
+        // Test Case 7 two bad sensors (all values different)
+        sensors[0] = 1;
+        sensors[1] = 100;
+        sensors[2] = 2;
+
+        prevSpeed = new int[]{100, 100};
+        setSpeed = 80;
+        maxAccel = 10;
+        error = 21;
+        System.out.println("Test 7 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+
+        // Test Case 8 bad previous values
+        sensors[0] = 100;
+        sensors[1] = 100;
+        sensors[2] = 100;
+
+        prevSpeed = new int[]{-1,100};
+        setSpeed = 80;
+        maxAccel = 10;
+        error = 21;
+        System.out.println("Test 8 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
+
+
+        // Test Case 9 all bad previous values
+        sensors[0] = 100;
+        sensors[1] = 100;
+        sensors[2] = 100;
+
+        prevSpeed = new int[]{-1,-1};
+        setSpeed = 80;
+        maxAccel = 10;
+        error = 21;
+        System.out.println("Test 9 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
 
     }
 }
