@@ -90,7 +90,7 @@ public class CruiseControlFaultTolerantB {
             return false;
         }
         if(maxSpeed > topSpeed){
-            System.out.println("Error: maxSpeed must be lower than topSpeed");
+            System.out.println("Error: maxSpeed must be lower or equal than topSpeed");
             return false;
         }
         if(error < 0){
@@ -122,7 +122,6 @@ public class CruiseControlFaultTolerantB {
             return false;
         }
 
-        // check if number of sensors >= 2
         if(speedSensors.length < 2 || speedSensors.length > 3){
             System.out.println("Error: number of sensors must be 2 or 3");
             return false;
@@ -136,9 +135,9 @@ public class CruiseControlFaultTolerantB {
 
         // check how many bad sensors are there
         for(short i = 0; i < speedSensors.length; i++){
-            if(speedSensors[i] < 0){
+            if(speedSensors[i] < 0 || speedSensors[i] > topSpeed){
                 badSensorsCount++;
-                System.out.println("Warning: sensor " + i + " provided a negative value");
+                System.out.println("Warning: sensor " + i + " provided a bad value");
             }
         }
         // There must be at least 2 non-negative vaule sensors
