@@ -1,7 +1,7 @@
 package CruiseControl;
 
 import java.util.zip.CRC32;
-public class CruiseControlFaultTolerant {
+public class CruiseControlFaultTolerantB {
 
     private int currentSpeed;
     private int currentSpeedReplica, errorReplica, maxAccelReplica, setSpeedReplica, topSpeedReplica;
@@ -152,7 +152,6 @@ public class CruiseControlFaultTolerant {
             System.out.println("Error: setSpeed must be in the range of min and max speed");
             return false;
         }
-
         return true;
     }
 
