@@ -9,20 +9,18 @@ import java.util.concurrent.TimeoutException;
 import CruiseControl.CruiseControlFaultTolerantB;
 public class MainCruiseControl {
     
-    private static CruiseControlFaultA cruiseControlA = new CruiseControlFaultA();
+    private static CruiseControlFaultTolerantA cruiseControlA = new CruiseControlFaultTolerantA();
     private static CruiseControlFaultTolerantB cruiseControlFaultTolerantB = new CruiseControlFaultTolerantB();
 
     private static float nVersionProgramming(final int minSpeed,final int maxSpeed, final int topSpeed,final int error, final int maxAccel, final int setSpeed,final int[] prevSpeed, final int[] speedSensors){
         float versionA, versionB;
         // run version A and Version B and compare results
-
+        versionA = cruiseControlA.computeAcceleration(speedSensors, prevSpeed, setSpeed, maxAccel, error);
 
         versionB = cruiseControlFaultTolerantB.cruiseControl(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed, prevSpeed, speedSensors);
 
-        // if (versionA==versionB)return versionA;
-        // else return (float) 0.0; // No acceleration
-        return versionB;
-
+        if (versionA==versionB)return versionA;
+        else return (float) 0.0; // No acceleration
     }
 
     private static float watchDog(final int minSpeed, final int maxSpeed, final int topSpeed, final int error, final int maxAccel, final int setSpeed, final int[] prevSpeed, final int[] speedSensors, long timeoutMillis) {
