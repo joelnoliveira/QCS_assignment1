@@ -114,16 +114,15 @@ public class ClimateControlFault {
         // Execução redundante: cálculo realizado duas vezes para verificação de consistência
         List<List<Integer>> result1 = computeAdjustment(desiredTemp, error, temps, fans);
         List<List<Integer>> result2 = computeAdjustment(desiredTemp, error, temps, fans);
-
+    
         if (!result1.equals(result2)) {
-            // Se os resultados não coincidirem, loga o erro e toma uma ação de rollback/fallback
             logError("Inconsistent computation detected. Initiating fallback strategy.");
-            // Aqui pode-se optar por retornar um valor de fallback, disparar um alerta, ou reexecutar o cálculo
-            return result1; // Retorna o primeiro resultado, considerando-o como fallback
+            return validateOutput(result1, fans, temps);
         }
         
         logInfo("Successfully adjusted fan duty cycles for " + temps.length + " zones.");
-        return result1;
+        return validateOutput(result1, fans, temps);
+    
     }
 
     /**
@@ -214,6 +213,63 @@ public class ClimateControlFault {
         }
         
         return validValues > 0 ? (double) sum / validValues : 0;
+    }
+
+    private static List<List<Integer>> validateOutput(List<List<Integer>> output, List<List<Integer>> originalFans, int[] temps) {
+        if (output == null) {
+            logError("Output is null. Using empty list as fallback.");
+            return new ArrayList<>();
+        }
+        
+        // Verifica se o output tem o mesmo número de zonas que o input
+        if (output.size() != temps.length) {
+            logError("Output size mismatch: expected " + temps.length + " zones, but got " + output.size());
+            // Corrigir estrutura - adicionando listas vazias para zonas faltantes
+            while (output.size() < temps.length) {
+                output.add(new ArrayList<>());
+            }
+            // Removendo zonas extras
+            while (output.size() > temps.length) {
+                output.remove(output.size() - 1);
+            }
+        }
+        
+        // Verifica cada zona
+        for (int i = 0; i < output.size(); i++) {
+            List<Integer> zoneOutput = output.get(i);
+            
+            if (zoneOutput == null) {
+                logError("Zone " + i + " output is null. Using empty list.");
+                output.set(i, new ArrayList<>());
+                continue;
+            }
+            
+            // Verifica se os valores estão no intervalo correto
+            List<Integer> correctedValues = new ArrayList<>();
+            for (Integer duty : zoneOutput) {
+                if (duty == null) {
+                    logError("Zone " + i + " contains null duty cycle. Using 0.");
+                    correctedValues.add(0);
+                } else if (duty < MIN_DUTY || duty > MAX_DUTY) {
+                    logError("Zone " + i + " has duty cycle out of range: " + duty);
+                    correctedValues.add(Math.max(MIN_DUTY, Math.min(MAX_DUTY, duty)));
+                } else {
+                    correctedValues.add(duty);
+                }
+            }
+            output.set(i, correctedValues);
+            
+            // Verifica se a estrutura corresponde ao input original
+            if (i < originalFans.size() && originalFans.get(i) != null) {
+                List<Integer> originalZone = originalFans.get(i);
+                if (zoneOutput.size() != originalZone.size()) {
+                    logWarning("Zone " + i + " output has different number of fans: expected " + 
+                              originalZone.size() + ", got " + zoneOutput.size());
+                }
+            }
+        }
+        
+        return output;
     }
     
     public static void main(String[] args) {
