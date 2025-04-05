@@ -8,6 +8,7 @@ public class CruiseControlFaultTolerant {
     private int[] prevSpeedReplica;
     private long curentSpeedCRC, errorCRC, maxAccelCRC, setSpeedCRC, topSpeedCRC;
     private long [] prevSpeedCRC;
+    private final short MAX_prevSpeeds = 30; // to avoid the calculation of the mean being overflowed
 
     private long calculateCRC(int value) {
         byte[] bytes = new byte[4];
@@ -210,6 +211,10 @@ public class CruiseControlFaultTolerant {
             if((prevSpeed[i] >= 0 && prevSpeed[i] <= topSpeed)){
                 speedAvg+=prevSpeed[i];
                 counter++;
+                if(counter >= MAX_prevSpeeds){
+                    System.out.println("Warning: too many previous speeds, only the first good" + MAX_prevSpeeds + " will be used");
+                    break;
+                }
             }
             //otherwise, print a warning
             else{
