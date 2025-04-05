@@ -50,21 +50,40 @@ public class ClimateControlFault {
     }
 
     /**
+     * Classe auxiliar para encapsular o resultado do ajuste dos duty cycles, incluindo
+     * um flag que indica se ocorreram erros durante a validação.
+     */
+    public static class AdjustmentResult {
+        public List<List<Integer>> result;
+        public boolean errorOccurred;
+        
+        public AdjustmentResult(List<List<Integer>> result, boolean errorOccurred) {
+            this.result = result;
+            this.errorOccurred = errorOccurred;
+        }
+        
+        @Override
+        public String toString() {
+            return "AdjustmentResult { result = " + result + ", errorOccurred = " + errorOccurred + " }";
+        }
+    }
+    
+    /**
      * Ajusta os duty cycles dos ventiladores com base na temperatura desejada,
      * margem de erro, temperaturas atuais e duty cycles atuais dos ventiladores.
      * 
      * Aplica validação de inputs, execução redundante (replicação) e tratamento
      * de exceções para garantir tolerância a falhas.
-     */
-    /**
      * 
-     * @param desiredTemp Temperatura desejada
-     * @param error Margem de erro
-     * @param temps Temperaturas atuais
-     * @param fans Duty cycles atuais dos ventiladores
-     * @return Lista de listas com os duty cycles ajustados para cada zona
+     * @param desiredTemp Temperatura desejada (em graus Celsius).
+     * @param error Margem de erro permitida (em graus Celsius).
+     * @param temps Array de temperaturas atuais (em graus Celsius) para cada zona.
+     * @param fans Lista de listas de duty cycles atuais (em porcentagem) para cada zona.
+     * 
+     * Retorna um AdjustmentResult que contém o output ajustado e um flag indicando se houve
+     * algum erro (ou correção) na validação.
      */
-    public static List<List<Integer>> adjustFanDuty(int desiredTemp, int error, int[] temps, List<List<Integer>> fans) {
+    public static AdjustmentResult adjustFanDuty(int desiredTemp, int error, int[] temps, List<List<Integer>> fans) {
         // Validação de Inputs
         if (temps == null || fans == null) {
             logError("Temps or fans cannot be null.");
@@ -117,12 +136,14 @@ public class ClimateControlFault {
     
         if (!result1.equals(result2)) {
             logError("Inconsistent computation detected. Initiating fallback strategy.");
-            return validateOutput(result1, fans, temps);
+            // Se as duas execuções forem inconsistentes, executa a validação e marca que houve erro
+            boolean valid = validateOutput(result1, fans, temps);
+            return new AdjustmentResult(result1, !valid);
         }
         
         logInfo("Successfully adjusted fan duty cycles for " + temps.length + " zones.");
-        return validateOutput(result1, fans, temps);
-    
+        boolean valid = validateOutput(result1, fans, temps);
+        return new AdjustmentResult(result1, !valid);
     }
 
     /**
@@ -178,7 +199,7 @@ public class ClimateControlFault {
             } catch (Exception e) {
                 // Isolamento de falhas por zona: em caso de erro, loga o problema e usa fallback para a zona
                 logError("Error processing zone " + i + ": " + e.getMessage());
-                result.add(new ArrayList<>()); // fallback: retorna lista vazia para essa zona
+                result.add(new ArrayList<>());
             }
         }
         return result;
@@ -194,7 +215,7 @@ public class ClimateControlFault {
             return 0;
         }
         
-        long sum = 0; // Use long to prevent overflow with large lists
+        long sum = 0; // Usa long para evitar overflow em somas grandes
         int validValues = 0;
         
         for (Integer duty : values) {
@@ -215,15 +236,22 @@ public class ClimateControlFault {
         return validValues > 0 ? (double) sum / validValues : 0;
     }
 
-    private static List<List<Integer>> validateOutput(List<List<Integer>> output, List<List<Integer>> originalFans, int[] temps) {
+    /**
+     * Valida o output dos duty cycles, corrigindo erros in-loco.
+     * Retorna true se nenhuma correção foi necessária; false caso contrário.
+     */
+    private static boolean validateOutput(List<List<Integer>> output, List<List<Integer>> originalFans, int[] temps) {
+        boolean isValid = true;
+        
         if (output == null) {
             logError("Output is null. Using empty list as fallback.");
-            return new ArrayList<>();
+            return false;
         }
         
         // Verifica se o output tem o mesmo número de zonas que o input
         if (output.size() != temps.length) {
             logError("Output size mismatch: expected " + temps.length + " zones, but got " + output.size());
+            isValid = false;
             // Corrigir estrutura - adicionando listas vazias para zonas faltantes
             while (output.size() < temps.length) {
                 output.add(new ArrayList<>());
@@ -241,6 +269,7 @@ public class ClimateControlFault {
             if (zoneOutput == null) {
                 logError("Zone " + i + " output is null. Using empty list.");
                 output.set(i, new ArrayList<>());
+                isValid = false;
                 continue;
             }
             
@@ -250,9 +279,11 @@ public class ClimateControlFault {
                 if (duty == null) {
                     logError("Zone " + i + " contains null duty cycle. Using 0.");
                     correctedValues.add(0);
+                    isValid = false;
                 } else if (duty < MIN_DUTY || duty > MAX_DUTY) {
                     logError("Zone " + i + " has duty cycle out of range: " + duty);
                     correctedValues.add(Math.max(MIN_DUTY, Math.min(MAX_DUTY, duty)));
+                    isValid = false;
                 } else {
                     correctedValues.add(duty);
                 }
@@ -265,11 +296,12 @@ public class ClimateControlFault {
                 if (zoneOutput.size() != originalZone.size()) {
                     logWarning("Zone " + i + " output has different number of fans: expected " + 
                               originalZone.size() + ", got " + zoneOutput.size());
+                    isValid = false;
                 }
             }
         }
         
-        return output;
+        return isValid;
     }
     
     public static void main(String[] args) {
@@ -281,79 +313,78 @@ public class ClimateControlFault {
         int[] temps1 = {23};
         int[] temps2 = {20, 18};
 
-       
-            // Test Case 1
-            List<List<Integer>> fans1 = new ArrayList<>();
-            fans1.add(Arrays.asList(0, 0, 0));
-            logInfo("Running TC1 with desired temp: " + desiredTemp + ", error margin: " + error);
-            List<List<Integer>> result1 = adjustFanDuty(desiredTemp, error, temps1, fans1);
-            logInfo("TC1 result: " + result1);
-            logInfo("----------");
+        // Test Case 1
+        List<List<Integer>> fans1 = new ArrayList<>();
+        fans1.add(Arrays.asList(0, 0, 0));
+        logInfo("Running TC1 with desired temp: " + desiredTemp + ", error margin: " + error);
+        AdjustmentResult result1 = adjustFanDuty(desiredTemp, error, temps1, fans1);
+        logInfo("TC1 result: " + result1);
+        logInfo("----------");
 
-            // Test Case 2
-            List<List<Integer>> fans2 = new ArrayList<>();
-            fans2.add(Arrays.asList(10, 10));
-            fans2.add(Arrays.asList(5, 5));
-            logInfo("Running TC2 with desired temp: " + desiredTemp + ", error margin: " + error);
-            List<List<Integer>> result2 = adjustFanDuty(desiredTemp, error, temps2, fans2);
-            logInfo("TC2 result: " + result2);
-            logInfo("----------");
+        // Test Case 2
+        List<List<Integer>> fans2 = new ArrayList<>();
+        fans2.add(Arrays.asList(10, 10));
+        fans2.add(Arrays.asList(5, 5));
+        logInfo("Running TC2 with desired temp: " + desiredTemp + ", error margin: " + error);
+        AdjustmentResult result2 = adjustFanDuty(desiredTemp, error, temps2, fans2);
+        logInfo("TC2 result: " + result2);
+        logInfo("----------");
 
-            // Test Case 3
-            List<List<Integer>> fans3 = new ArrayList<>();
-            fans3.add(Arrays.asList(10, 0));
-            fans3.add(Arrays.asList(0, 0));
-            logInfo("Running TC3 with desired temp: " + desiredTemp + ", error margin: " + error);
-            List<List<Integer>> result3 = adjustFanDuty(desiredTemp, error, temps2, fans3);
-            logInfo("TC3 result: " + result3);
-            logInfo("----------");
+        // Test Case 3
+        List<List<Integer>> fans3 = new ArrayList<>();
+        fans3.add(Arrays.asList(10, 0));
+        fans3.add(Arrays.asList(0, 0));
+        logInfo("Running TC3 with desired temp: " + desiredTemp + ", error margin: " + error);
+        AdjustmentResult result3 = adjustFanDuty(desiredTemp, error, temps2, fans3);
+        logInfo("TC3 result: " + result3);
+        logInfo("----------");
 
-            // Test Case 4 
-            List<List<Integer>> fans4 = new ArrayList<>();
-            fans4.add(Arrays.asList(10, 0));
-            fans4.add(Arrays.asList(0, 0));
-            logInfo("Running TC4 with desired temp: 15, error margin: " + error);
-            List<List<Integer>> result4 = adjustFanDuty(15, error, temps2, fans4);
-            logInfo("TC4 result: " + result4);
-            logInfo("----------");
+        // Test Case 4 
+        List<List<Integer>> fans4 = new ArrayList<>();
+        fans4.add(Arrays.asList(10, 0));
+        fans4.add(Arrays.asList(0, 0));
+        logInfo("Running TC4 with desired temp: 15, error margin: " + error);
+        AdjustmentResult result4 = adjustFanDuty(15, error, temps2, fans4);
+        logInfo("TC4 result: " + result4);
+        logInfo("----------");
 
-            // Test Case 5
-            List<List<Integer>> fans5 = new ArrayList<>();
-            fans5.add(Arrays.asList(95, 70));
-            fans5.add(Arrays.asList(100, 0));
-            logInfo("Running TC5 with desired temp: 30, error margin: " + error);
-            List<List<Integer>> result5 = adjustFanDuty(30, error, temps2, fans5);
-            logInfo("TC5 result: " + result5);
+        // Test Case 5
+        List<List<Integer>> fans5 = new ArrayList<>();
+        fans5.add(Arrays.asList(95, 70));
+        fans5.add(Arrays.asList(100, 0));
+        logInfo("Running TC5 with desired temp: 30, error margin: " + error);
+        AdjustmentResult result5 = adjustFanDuty(30, error, temps2, fans5);
+        logInfo("TC5 result: " + result5);
+        logInfo("----------");
+        
+        // Test Case 6 - Testar com temperatura inválida
+        try {
+            int[] invalidTemps = {-100, 200};
+            List<List<Integer>> fans6 = new ArrayList<>();
+            fans6.add(Arrays.asList(50, 50));
+            fans6.add(Arrays.asList(50, 50));
+            logInfo("Running TC6 with invalid temperature");
+            AdjustmentResult result6 = adjustFanDuty(desiredTemp, error, invalidTemps, fans6);
+            logInfo("TC6 result: " + result6);
             logInfo("----------");
-            
-            // Test Case 6 - Testar com temperatura inválida
-            try {
-                int[] invalidTemps = {-100, 200};
-                List<List<Integer>> fans6 = new ArrayList<>();
-                fans6.add(Arrays.asList(50, 50));
-                fans6.add(Arrays.asList(50, 50));
-                logInfo("Running TC6 with invalid temperature");
-                List<List<Integer>> result6 = adjustFanDuty(desiredTemp, error, invalidTemps, fans6);
-                logInfo("TC6 result: " + result6);
-                logInfo("----------");
-            } catch (IllegalArgumentException e) {
-                logInfo("TC6 correctly caught invalid temperature: " + e.getMessage());
-                logInfo("----------");
-            }
-            
-            // Test Case 7 - Testar com duty cycle inválido
-            try {
-                List<List<Integer>> fans7 = new ArrayList<>();
-                fans7.add(Arrays.asList(150, 50));
-                logInfo("Running TC7 with invalid duty cycle");
-                List<List<Integer>> result7 = adjustFanDuty(desiredTemp, error, temps1, fans7);
-                logInfo("TC7 result: " + result7);
-                logInfo("----------");
-            } catch (IllegalArgumentException e) {
-                logInfo("TC7 correctly caught invalid duty cycle: " + e.getMessage());
-                logInfo("----------");
-            }
-            
+        } catch (IllegalArgumentException e) {
+            logInfo("TC6 correctly caught invalid temperature: " + e.getMessage());
+            logInfo("----------");
+        }
+        
+        // Test Case 7 - Testar com duty cycle inválido
+        try {
+            List<List<Integer>> fans7 = new ArrayList<>();
+            fans7.add(Arrays.asList(150, 50));
+            logInfo("Running TC7 with invalid duty cycle");
+            AdjustmentResult result7 = adjustFanDuty(desiredTemp, error, temps1, fans7);
+            logInfo("TC7 result: " + result7);
+            logInfo("----------");
+        } catch (IllegalArgumentException e) {
+            logInfo("TC7 correctly caught invalid duty cycle: " + e.getMessage());
+            logInfo("----------");
+        }
+        
         System.out.println("Tests completed. Check logs in " + LOG_FILE + " for details.");
     }
 }
