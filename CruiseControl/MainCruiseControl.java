@@ -112,8 +112,6 @@ public class MainCruiseControl {
 
         System.out.println("Test 5 final result: " + watchDog(minSpeed, maxSpeed, topSpeed, error, maxAccel, setSpeed,prevSpeed,sensors, timeoutMillis));
 
-        System.out.println("all done");
-
         // Test Case 6 one bad sensor
         sensors[0] = 100;
         sensors[1] = 1;
